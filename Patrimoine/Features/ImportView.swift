@@ -92,14 +92,14 @@ struct ImportView: View {
                             })) {
                                 if let row = line.movement {
                                     VStack(alignment: .leading, spacing: 5) {
-                                        Text("\(row.kind.label) · \(row.instrumentKey)").font(.subheadline.weight(.semibold))
+                                        Text(row.kind.label + (row.instrumentKey.isEmpty ? "" : " · " + row.instrumentKey)).font(.subheadline.weight(.semibold))
                                         Text(row.date, format: .dateTime.day().month().year().hour().minute()).font(.caption)
                                         HStack { MoneyText(value: row.amount); Text("brut · frais").font(.caption); MoneyText(value: row.fees) }
                                         MetricRow(title: "Mouvement de liquidités", value: row.cashMovement)
                                         if row.quantity > 0 { Text("Quantité : \(row.quantity.formatted())").font(.caption) }
                                         if !row.quoteCurrency.isEmpty { Text("Devise de cotation : " + row.quoteCurrency).font(.caption).foregroundStyle(.secondary) }
                                     }
-                                } else { Text("Ligne \(line.id + 2) : \(line.issue ?? "invalide")").font(.footnote).foregroundStyle(.orange) }
+                                } else { Text("Ligne \(line.id + 2) : \(line.issue ?? "invalide")").font(.footnote).foregroundStyle(Palette.warning) }
                             }
                             if let status = prepared.first(where: { $0.id == line.id }) {
                                 if status.conflict { InlineIssue(message: "Identifiant déjà présent avec des données différentes : import bloqué.") }

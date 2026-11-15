@@ -6,6 +6,8 @@ enum Palette {
     static let accent = Color("AccentColor")
     static let onAccent = Color("OnAccentColor")
     static let positive = Color("PositiveColor")
+    static let warning = Color("WarningColor")
+    static let negative = Color("NegativeColor")
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
@@ -51,9 +53,9 @@ struct PerformanceBadge: View {
             MoneyText(value: value)
         }
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(value >= 0 ? Palette.positive : .red)
+        .foregroundStyle(value >= 0 ? Palette.positive : Palette.negative)
         .padding(.horizontal, 11).padding(.vertical, 7)
-        .background((value >= 0 ? Palette.positive : .red).opacity(0.12), in: Capsule())
+        .background((value >= 0 ? Palette.positive : Palette.negative).opacity(0.12), in: Capsule())
     }
 }
 
@@ -75,7 +77,7 @@ struct InlineIssue: View {
     let message: String
     var body: some View {
         Label(message, systemImage: "exclamationmark.circle")
-            .font(.footnote).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            .font(.footnote).foregroundStyle(Palette.warning).fixedSize(horizontal: false, vertical: true)
     }
 }
 
