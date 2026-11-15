@@ -20,7 +20,7 @@ import SwiftData
                     VStack(spacing: 24) {
                         EmptyStateView(title: "Données temporairement indisponibles",
                             message: "Le stockage n’a pas pu être ouvert. Aucune donnée n’a été effacée. Déverrouillez l’iPhone puis réessayez.", symbol: "lock.shield")
-                        Button("Réessayer", action: loadStore).buttonStyle(.borderedProminent)
+                        Button("Réessayer", action: loadStore).buttonStyle(PrimaryButtonStyle())
                     }.padding(24)
                 } else {
                     ProgressView("Ouverture du coffre local…")
@@ -75,7 +75,7 @@ struct LockScreen: View {
                     message: "Authentifiez-vous pour consulter vos comptes.", symbol: "lock.shield")
                 Button { Task { await lock.authenticate() } } label: {
                     Label("Déverrouiller", systemImage: "faceid").frame(minHeight: 44)
-                }.buttonStyle(.borderedProminent).disabled(lock.authenticating)
+                }.buttonStyle(PrimaryButtonStyle()).disabled(lock.authenticating)
                 if let message = lock.message { Text(message).font(.footnote).foregroundStyle(.secondary) }
             }.padding(24)
         }

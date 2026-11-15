@@ -4,7 +4,22 @@ enum Palette {
     static let background = Color("BackgroundColor")
     static let surface = Color("SurfaceColor")
     static let accent = Color("AccentColor")
+    static let onAccent = Color("OnAccentColor")
     static let positive = Color("PositiveColor")
+}
+
+struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.medium))
+            .foregroundStyle(Palette.onAccent)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(Palette.accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .opacity(!isEnabled ? 0.45 : configuration.isPressed ? 0.8 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: configuration.isPressed)
+    }
 }
 
 struct FinancialCard<Content: View>: View {

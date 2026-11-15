@@ -25,7 +25,7 @@ struct AccountsView: View {
                 }
                 Button { create = true } label: {
                     Label("Nouveau portefeuille", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 44)
-                }.buttonStyle(.borderedProminent)
+                }.buttonStyle(PrimaryButtonStyle())
             }.padding(20)
         }
         .background(Palette.background).navigationTitle("Portefeuilles")
@@ -134,7 +134,7 @@ struct AccountDetailView: View {
                     if let issue = summary.issue { InlineIssue(message: issue) }
                 }
                 if !account.archived {
-                    Button { addMovement = true } label: { Label("Enregistrer une opération", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.borderedProminent)
+                    Button { addMovement = true } label: { Label("Enregistrer une opération", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(PrimaryButtonStyle())
                 }
                 HStack {
                     SectionHeading(title: "Positions")

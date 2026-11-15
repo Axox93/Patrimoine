@@ -65,13 +65,17 @@ jobs:
           set -euo pipefail
           swift test 2>&1 | tee build/logs/core-tests.log
       - name: Test persistence and interface on iPhone simulator
+        timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
           DEVICE_ID=$(xcrun simctl list devices available --json | python3 scripts/select-simulator.py "$(xcrun --sdk iphonesimulator --show-sdk-version)")
+          xcrun simctl bootstatus "$DEVICE_ID" -b
           xcodebuild test -project Patrimoine.xcodeproj -scheme Patrimoine -configuration Debug \
             -destination "platform=iOS Simulator,id=$DEVICE_ID,arch=$(uname -m)" -resultBundlePath build/Tests.xcresult \
             -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
             2>&1 | tee build/logs/simulator-tests.log
       - name: Export native interface captures
         if: always()

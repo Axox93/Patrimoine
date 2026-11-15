@@ -48,7 +48,7 @@ struct DashboardView: View {
                             message: "Créez un PEA ou un compte-titres, puis enregistrez votre premier versement. Aucune donnée de démonstration n’est ajoutée.")
                         Button { showCreate = true } label: {
                             Label("Créer un portefeuille", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 44)
-                        }.buttonStyle(.borderedProminent)
+                        }.buttonStyle(PrimaryButtonStyle())
                     }
                 } else {
                     FinancialCard {
