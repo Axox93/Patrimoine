@@ -6,6 +6,7 @@ on:
     paths:
       - 'Patrimoine/**'
       - 'PatrimoineTests/**'
+      - 'PatrimoineUITests/**'
       - 'Patrimoine.xcodeproj/**'
       - 'Sources/**'
       - 'Tests/**'
@@ -63,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           swift test 2>&1 | tee build/logs/core-tests.log
-      - name: Test persistence on iPhone simulator
+      - name: Test persistence and interface on iPhone simulator
         shell: bash
         run: |
           set -euo pipefail
@@ -72,6 +73,13 @@ jobs:
             -destination "platform=iOS Simulator,id=$DEVICE_ID,arch=$(uname -m)" -resultBundlePath build/Tests.xcresult \
             -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee build/logs/simulator-tests.log
+      - name: Export native interface captures
+        if: always()
+        shell: bash
+        run: |
+          if [[ -d build/Tests.xcresult ]]; then
+            xcrun xcresulttool export attachments --path build/Tests.xcresult --output-path build/screenshots
+          fi
       - name: Archive and package IPA
         shell: bash
         run: bash scripts/build-ipa.sh
@@ -98,5 +106,6 @@ jobs:
           path: |
             build/logs/
             build/Tests.xcresult
+            build/screenshots/
           if-no-files-found: warn
           retention-days: 3

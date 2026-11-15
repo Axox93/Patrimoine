@@ -17,20 +17,23 @@ const files = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true 
 }).sort();
 const app = files('Patrimoine');
 const tests = files('PatrimoineTests');
+const uiTests = files('PatrimoineUITests');
 const fileRef = file => add(`ref:${file}`, `isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ${q(file)}; sourceTree = "<group>";`);
 const buildRef = file => add(`build:${file}`, `isa = PBXBuildFile; fileRef = ${id(`ref:${file}`)};`);
 const appRefs = app.map(fileRef), testRefs = tests.map(fileRef);
 const appBuilds = app.map(buildRef), testBuilds = tests.map(buildRef);
+const uiRefs = uiTests.map(fileRef), uiBuilds = uiTests.map(buildRef);
 const resources = ['Patrimoine/Resources/Assets.xcassets', 'Patrimoine/Resources/PrivacyInfo.xcprivacy'];
 const resourceRefs = resources.map(file => add(`ref:${file}`, `isa = PBXFileReference; lastKnownFileType = ${file.endsWith('xcassets') ? 'folder.assetcatalog' : 'text.xml'}; path = ${q(file)}; sourceTree = "<group>";`));
 const resourceBuilds = resources.map(buildRef);
-for (const [key, name, type] of [['appProduct', 'Patrimoine.app', 'wrapper.application'], ['testProduct', 'PatrimoineTests.xctest', 'wrapper.cfbundle']]) {
+for (const [key, name, type] of [['appProduct', 'Patrimoine.app', 'wrapper.application'], ['testProduct', 'PatrimoineTests.xctest', 'wrapper.cfbundle'], ['uiProduct', 'PatrimoineUITests.xctest', 'wrapper.cfbundle']]) {
   add(key, `isa = PBXFileReference; explicitFileType = ${type}; includeInIndex = 0; path = ${q(name)}; sourceTree = BUILT_PRODUCTS_DIR;`);
 }
 add('appGroup', `isa = PBXGroup; children = ${list([...appRefs, ...resourceRefs])}; name = Patrimoine; sourceTree = "<group>";`);
 add('testGroup', `isa = PBXGroup; children = ${list(testRefs)}; name = PatrimoineTests; sourceTree = "<group>";`);
-add('productGroup', `isa = PBXGroup; children = ${list([id('appProduct'), id('testProduct')])}; name = Products; sourceTree = "<group>";`);
-add('rootGroup', `isa = PBXGroup; children = ${list([id('appGroup'), id('testGroup'), id('productGroup')])}; sourceTree = "<group>";`);
+add('uiGroup', `isa = PBXGroup; children = ${list(uiRefs)}; name = PatrimoineUITests; sourceTree = "<group>";`);
+add('productGroup', `isa = PBXGroup; children = ${list([id('appProduct'), id('testProduct'), id('uiProduct')])}; name = Products; sourceTree = "<group>";`);
+add('rootGroup', `isa = PBXGroup; children = ${list([id('appGroup'), id('testGroup'), id('uiGroup'), id('productGroup')])}; sourceTree = "<group>";`);
 add('localPackage', 'isa = XCLocalSwiftPackageReference; relativePath = ".";');
 for (const target of ['app', 'test']) {
   add(`${target}Package`, `isa = XCSwiftPackageProductDependency; package = ${id('localPackage')}; productName = PatrimoineCore;`);
@@ -43,27 +46,38 @@ add('proxy', `isa = PBXContainerItemProxy; containerPortal = ${id('project')}; p
 add('testDependency', `isa = PBXTargetDependency; target = ${id('appTarget')}; targetProxy = ${id('proxy')};`);
 add('appTarget', `isa = PBXNativeTarget; buildConfigurationList = ${id('appConfigs')}; buildPhases = ${list([id('appSources'), id('appFrameworks'), id('resources')])}; buildRules = (); dependencies = (); name = Patrimoine; packageProductDependencies = ${list([id('appPackage')])}; productName = Patrimoine; productReference = ${id('appProduct')}; productType = "com.apple.product-type.application";`);
 add('testTarget', `isa = PBXNativeTarget; buildConfigurationList = ${id('testConfigs')}; buildPhases = ${list([id('testSources'), id('testFrameworks')])}; buildRules = (); dependencies = ${list([id('testDependency')])}; name = PatrimoineTests; packageProductDependencies = ${list([id('testPackage')])}; productName = PatrimoineTests; productReference = ${id('testProduct')}; productType = "com.apple.product-type.bundle.unit-test";`);
-for (const scope of ['project', 'app', 'test']) {
+add('uiSources', `isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ${list(uiBuilds)}; runOnlyForDeploymentPostprocessing = 0;`);
+add('uiFrameworks', 'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;');
+add('uiTarget', `isa = PBXNativeTarget; buildConfigurationList = ${id('uiConfigs')}; buildPhases = ${list([id('uiSources'), id('uiFrameworks')])}; buildRules = (); dependencies = ${list([id('testDependency')])}; name = PatrimoineUITests; productName = PatrimoineUITests; productReference = ${id('uiProduct')}; productType = "com.apple.product-type.bundle.ui-testing";`);
+for (const scope of ['project', 'app', 'test', 'ui']) {
   for (const config of ['Debug', 'Release']) {
     const common = `IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; ONLY_ACTIVE_ARCH = ${config === 'Debug' ? 'YES' : 'NO'};`;
     const projectSettings = `${common} ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_OBJC_ARC = YES; ENABLE_TESTABILITY = ${config === 'Debug' ? 'YES' : 'NO'}; DEBUG_INFORMATION_FORMAT = ${config === 'Debug' ? 'dwarf' : '"dwarf-with-dsym"'}; SWIFT_OPTIMIZATION_LEVEL = ${config === 'Debug' ? '"-Onone"' : '"-O"'}; SWIFT_ACTIVE_COMPILATION_CONDITIONS = ${config === 'Debug' ? 'DEBUG' : '""'};`;
     const targetSettings = `${common} PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0;`;
     const settings = scope === 'project' ? projectSettings : scope === 'app'
       ? `${targetSettings} PRODUCT_BUNDLE_IDENTIFIER = fr.patrimoine.personal; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Patrimoine/Resources/Info.plist; CODE_SIGN_ENTITLEMENTS = Patrimoine/Resources/Patrimoine.entitlements; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";`
-      : `${targetSettings} PRODUCT_BUNDLE_IDENTIFIER = fr.patrimoine.personal.tests; GENERATE_INFOPLIST_FILE = YES; BUNDLE_LOADER = "$(TEST_HOST)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Patrimoine.app/Patrimoine"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";`;
+      : scope === 'test'
+      ? `${targetSettings} PRODUCT_BUNDLE_IDENTIFIER = fr.patrimoine.personal.tests; GENERATE_INFOPLIST_FILE = YES; BUNDLE_LOADER = "$(TEST_HOST)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Patrimoine.app/Patrimoine"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";`
+      : `${targetSettings} PRODUCT_BUNDLE_IDENTIFIER = fr.patrimoine.personal.uitests; GENERATE_INFOPLIST_FILE = YES; TEST_TARGET_NAME = Patrimoine; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";`;
     add(`${scope}:${config}`, `isa = XCBuildConfiguration; buildSettings = { ${settings} }; name = ${config};`);
   }
   add(`${scope}Configs`, `isa = XCConfigurationList; buildConfigurations = ${list([id(`${scope}:Debug`), id(`${scope}:Release`)])}; defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;`);
 }
 add('project', `isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1640; TargetAttributes = { ${id('appTarget')} = { CreatedOnToolsVersion = 16.4; }; ${id('testTarget')} = { CreatedOnToolsVersion = 16.4; TestTargetID = ${id('appTarget')}; }; }; }; buildConfigurationList = ${id('projectConfigs')}; compatibilityVersion = "Xcode 14.0"; developmentRegion = fr; hasScannedForEncodings = 0; knownRegions = (fr, en, Base); mainGroup = ${id('rootGroup')}; productRefGroup = ${id('productGroup')}; packageReferences = ${list([id('localPackage')])}; projectDirPath = ""; projectRoot = ""; targets = ${list([id('appTarget'), id('testTarget')])};`);
 const projectDir = path.join(root, 'Patrimoine.xcodeproj');
+// Include the independent UI test runner in the project targets.
+const projectIndex = objects.findIndex(object => object.startsWith(id('project') + ' ='));
+objects[projectIndex] = objects[projectIndex].replace(
+  'targets = ' + list([id('appTarget'), id('testTarget')]),
+  'targets = ' + list([id('appTarget'), id('testTarget'), id('uiTarget')])
+);
 fs.mkdirSync(path.join(projectDir, 'xcshareddata/xcschemes'), { recursive: true });
 fs.writeFileSync(path.join(projectDir, 'project.pbxproj'), `// !$*UTF8*$!\n{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n${objects.join('\n')}\n}; rootObject = ${id('project')}; }\n`);
 const ref = (target, buildable, name) => `<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="${id(target)}" BuildableName="${buildable}" BlueprintName="${name}" ReferencedContainer="container:Patrimoine.xcodeproj"/>`;
 fs.writeFileSync(path.join(projectDir, 'xcshareddata/xcschemes/Patrimoine.xcscheme'), `<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion="1640" version="1.3">
  <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">${ref('appTarget','Patrimoine.app','Patrimoine')}</BuildActionEntry></BuildActionEntries></BuildAction>
- <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables><TestableReference skipped="NO">${ref('testTarget','PatrimoineTests.xctest','PatrimoineTests')}</TestableReference></Testables></TestAction>
+ <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables><TestableReference skipped="NO">${ref('testTarget','PatrimoineTests.xctest','PatrimoineTests')}</TestableReference><TestableReference skipped="NO">${ref('uiTarget','PatrimoineUITests.xctest','PatrimoineUITests')}</TestableReference></Testables></TestAction>
  <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">${ref('appTarget','Patrimoine.app','Patrimoine')}</BuildableProductRunnable></LaunchAction>
  <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0">${ref('appTarget','Patrimoine.app','Patrimoine')}</BuildableProductRunnable></ProfileAction>
  <AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>

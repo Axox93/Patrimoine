@@ -82,8 +82,8 @@ struct MoreView: View {
     var body: some View {
         List {
             Section("Votre espace") {
-                NavigationLink("Instruments", systemImage: "list.bullet.rectangle") { InstrumentsView() }
-                NavigationLink("Corbeille", systemImage: "trash") { TrashView() }
+                NavigationLink { InstrumentsView() } label: { Label("Instruments", systemImage: "list.bullet.rectangle") }
+                NavigationLink { TrashView() } label: { Label("Corbeille", systemImage: "trash") }
             }
             Section("Confidentialité") {
                 Toggle("Masquer les montants", isOn: $hidden)

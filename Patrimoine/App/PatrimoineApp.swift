@@ -27,6 +27,7 @@ import SwiftData
                 }
             }
             .tint(Palette.accent)
+            .preferredColorScheme(testColorScheme)
             .task { if container == nil { loadStore() } }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { lock.lock() }
@@ -34,8 +35,21 @@ import SwiftData
         }
     }
     @MainActor private func loadStore() {
-        do { container = try StoreFactory.make(); storageIssue = false }
+        #if DEBUG
+        let inMemory = ProcessInfo.processInfo.arguments.contains("-patrimoine-ui-test")
+        #else
+        let inMemory = false
+        #endif
+        do { container = try StoreFactory.make(inMemory: inMemory); storageIssue = false }
         catch { storageIssue = true }
+    }
+    private var testColorScheme: ColorScheme? {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-patrimoine-ui-test") {
+            return ProcessInfo.processInfo.environment["PATRIMOINE_TEST_APPEARANCE"] == "dark" ? .dark : .light
+        }
+        #endif
+        return nil
     }
 }
 

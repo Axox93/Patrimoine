@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 root = pathlib.Path(__file__).resolve().parent.parent
 project = (root/'Patrimoine.xcodeproj/project.pbxproj').read_text()
-for folder in ['Patrimoine','PatrimoineTests']:
+for folder in ['Patrimoine','PatrimoineTests','PatrimoineUITests']:
     for source in (root/folder).rglob('*.swift'):
         assert source.relative_to(root).as_posix() in project, f'Missing build reference: {source}'
 definitions = re.findall(r'^([0-9A-F]{24}) =', project, re.M)
