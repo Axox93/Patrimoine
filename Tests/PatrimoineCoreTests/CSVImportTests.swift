@@ -37,7 +37,7 @@ final class CSVImportTests: XCTestCase {
         XCTAssertNotNil(try CSVImport.preview(cancelled, mapping: cancelledMap)[0].issue)
     }
     func testDegiroSignedQuantityAndSeparateTime() throws {
-        let table = try CSVTable("Date;Heure;ISIN;Quantité;Montant;Devise;Frais;ID\n02-01-2026;10:00;FR0000000001;2;-102;EUR;-2;FAKE-DG-1\n03-01-2026;11:00;FR0000000001;-1;60;EUR;0;FAKE-DG-2")
+        let table = try CSVTable("Date;Heure;ISIN;Quantité;Montant;Devise;Frais;ID\n02-01-2026;10:00;FR0000000001;+2;-102;EUR;-2;FAKE-DG-1\n03-01-2026;11:00;FR0000000001;-1;+60;EUR;0;FAKE-DG-2")
         var mapping = CSVMapping(headers: table.headers, broker: .degiro)
         mapping.basis = .netCash; mapping.signedAmounts = true; mapping.inferTradesFromQuantity = true
         mapping.dateFormat = "dd-MM-yyyy HH:mm"

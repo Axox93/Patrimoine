@@ -64,7 +64,7 @@ struct ImportView: View {
                     TextEditor(text: $source).frame(minHeight: 150).font(.system(.caption, design: .monospaced))
                         .textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("import.csv.source")
                     Button("Lire les colonnes", action: readColumns)
-                    Text("CSV UTF-8 ou UTF-16, séparateur virgule, point-virgule ou tabulation. Montants positifs sans séparateur de milliers ; le type d’opération détermine le signe.").font(.caption).foregroundStyle(.secondary)
+                    Text("CSV UTF-8 ou UTF-16 avec BOM, séparateur virgule, point-virgule ou tabulation. Aucun séparateur de milliers. Les sorties négatives sont acceptées seulement en mode montants signés.").font(.caption).foregroundStyle(.secondary)
                 }
             }
             if let table {
@@ -76,7 +76,7 @@ struct ImportView: View {
                         ForEach(instrumentKeys, id: \.self) { key in
                             Picker(key, selection: Binding(get: { links[key] }, set: { links[key] = $0; prepared = [] })) {
                                 Text("Choisir").tag(UUID?.none)
-                                ForEach(instruments) { Text($0.name + " · " + $0.exchange).tag(Optional($0.id)) }
+                                ForEach(instruments) { Text($0.name + " · " + $0.exchange + " · " + $0.currency).tag(Optional($0.id)) }
                             }
                         }
                         Button("Créer un instrument", systemImage: "plus") { showInstrument = true }
@@ -97,6 +97,7 @@ struct ImportView: View {
                                         HStack { MoneyText(value: row.amount); Text("brut · frais").font(.caption); MoneyText(value: row.fees) }
                                         MetricRow(title: "Mouvement de liquidités", value: row.cashMovement)
                                         if row.quantity > 0 { Text("Quantité : \(row.quantity.formatted())").font(.caption) }
+                                        if !row.quoteCurrency.isEmpty { Text("Devise de cotation : " + row.quoteCurrency).font(.caption).foregroundStyle(.secondary) }
                                     }
                                 } else { Text("Ligne \(line.id + 2) : \(line.issue ?? "invalide")").font(.footnote).foregroundStyle(.orange) }
                             }
@@ -154,7 +155,7 @@ struct ImportView: View {
         .onChange(of: accountID) { _, _ in prepared = []; success = nil }
         .onChange(of: broker) { _, newBroker in
             if let table { mapping = CSVMapping(headers: table.headers, broker: newBroker); mapping.timeZoneID = "" }
-            feesConfirmed = false; invalidate()
+            feesConfirmed = false; links = [:]; invalidate()
         }
         .onChange(of: source) { _, _ in table = nil; lines = []; prepared = []; success = nil }
         .task {
@@ -174,6 +175,7 @@ struct ImportView: View {
             column("Type d’opération", binding: $mapping.kind, table: table)
             column("Montant total", binding: $mapping.amount, table: table)
             column("Devise du montant", binding: $mapping.currency, table: table)
+            column("Devise de cotation (si disponible)", binding: $mapping.quoteCurrency, table: table)
             column("Quantité", binding: $mapping.quantity, table: table)
             column("Ticker", binding: $mapping.symbol, table: table)
             column("ISIN", binding: $mapping.isin, table: table)
@@ -208,15 +210,22 @@ struct ImportView: View {
                 ForEach(["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd", "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy HH:mm", "dd-MM-yyyy", "dd-MM-yyyy HH:mm", "yyyy-MM-dd'T'HH:mm:ssXXXXX"], id: \.self) { Text($0).tag($0) }
             }
             TextField("Fuseau des dates sans décalage", text: $mapping.timeZoneID).textInputAutocapitalization(.never).autocorrectionDisabled()
-            ForEach(table.headers.indices, id: \.self) { index in
-                Toggle("Frais / retenue : \(table.headers[index])", isOn: Binding(get: { mapping.fees.contains(index) }, set: {
-                    if $0 { mapping.fees.insert(index) } else { mapping.fees.remove(index) }
-                })).font(.caption)
+            Text(mapping.fees.isEmpty ? "Aucune colonne de frais sélectionnée : vérifiez le fichier." : "Frais sélectionnés : " + mapping.fees.sorted().map { table.headers[$0] }.joined(separator: ", "))
+                .font(.footnote).foregroundStyle(.secondary)
+            DisclosureGroup("Choisir les colonnes de frais et retenues") {
+                ForEach(table.headers.indices, id: \.self) { index in
+                    Toggle("Frais / retenue : \(table.headers[index])", isOn: Binding(get: { mapping.fees.contains(index) }, set: {
+                        if $0 { mapping.fees.insert(index) } else { mapping.fees.remove(index) }
+                    })).font(.caption)
+                }
             }
             Toggle("J’ai vérifié le brut/net, le fuseau des dates et toutes les colonnes de frais dans la devise du compte", isOn: $feesConfirmed).font(.footnote)
             Button("Prévisualiser les opérations", action: preview).disabled(!feesConfirmed)
         }
-        .onChange(of: mapping) { _, _ in invalidate() }
+        .onChange(of: mapping) { old, new in
+            if old.isin != new.isin || old.symbol != new.symbol { links = [:] }
+            feesConfirmed = false; invalidate()
+        }
         .onChange(of: feesConfirmed) { _, value in if !value { invalidate() } }
     }
     private func column(_ title: String, binding: Binding<Int>, table: CSVTable) -> some View {

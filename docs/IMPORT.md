@@ -10,7 +10,7 @@ L’import est **manuel et assisté**, depuis **Plus → Importer un compte**. I
 4. Choisir brut ou mouvement net de liquidités, le séparateur décimal, le format de date et le fuseau horaire des dates sans décalage.
 5. Vérifier toutes les colonnes de frais et retenues. Les montants et frais doivent déjà être dans la devise comptable EUR ; aucun change n’est inventé.
 6. Prévisualiser. Une ligne inconnue, incohérente ou en attente est signalée. La corriger dans l’éditeur, associer son libellé explicitement ou l’exclure volontairement.
-7. Associer les titres aux instruments enregistrés, ou créer les instruments en vérifiant ISIN et place de cotation.
+7. Associer les titres aux instruments enregistrés, ou créer les instruments en vérifiant ISIN, place et devise de cotation. Une devise de cotation présente dans le CSV doit correspondre à celle de l’instrument choisi.
 8. Vérifier les doublons et le journal complet. Comparer le mouvement de liquidités affiché aux mouvements du courtier.
 9. Confirmer. Toutes les nouvelles opérations sont validées avant l’écriture ; un journal incohérent bloque l’ensemble du lot.
 
@@ -51,7 +51,8 @@ Les documents scannés sans couche texte, protégés, trop longs ou non lisibles
 - 5 Mo et 10 000 opérations maximum par CSV ; PDF de 100 pages maximum avec texte exploitable.
 - CSV UTF-8 ou UTF-16 avec BOM ; séparateurs virgule, point-virgule ou tabulation ; champs entre guillemets et fins de ligne Windows pris en charge.
 - Un seul séparateur décimal choisi pour le fichier ; aucun séparateur de milliers.
-- Comptabilité en EUR, pas de conversion automatique. Les instruments et valorisations disponibles restent ceux de la version manuelle.
+- Comptabilité en EUR, pas de conversion automatique. La devise de cotation d’un titre peut être USD ou une autre devise proposée, mais les coûts et frais importés doivent déjà être en EUR. Les valorisations manuelles doivent également être des valeurs équivalentes en EUR, explicitement déclarées par l’utilisateur.
+- Les prix unitaires d’origine et taux de change ne sont pas enregistrés par cet import : conserver le fichier original. Un montant comptable en USD ne sera pas assimilé à un montant EUR.
 - Historique incomplet, liquidités négatives ou vente dépassant les titres détenus : import bloqué. Aucun versement fictif ni solde de départ inventé.
 - La lecture du fichier et sa préparation sont effectuées hors du fil d’interface. Les données ne sont écrites qu’après confirmation explicite.
 - Les tests utilisent uniquement des données fictives. Les variantes d’exports personnels des trois établissements ne sont pas toutes validées. Un petit exemple anonymisé permettrait de compléter les adaptateurs, sans publier le relevé personnel.

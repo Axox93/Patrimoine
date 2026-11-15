@@ -78,6 +78,7 @@ public struct CSVMapping: Sendable, Equatable {
     public var date = -1, kind = -1, amount = -1, currency = -1, quantity = -1
     public var symbol = -1, isin = -1, externalID = -1
     public var status = -1
+    public var quoteCurrency = -1
     public var time = -1
     public var broker: ImportBroker = .trading212
     public var signedAmounts = false
@@ -98,6 +99,7 @@ public struct CSVMapping: Sendable, Equatable {
         quantity = find(["no. of shares", "quantity", "quantité"])
         symbol = find(["ticker", "symbol"]); isin = find(["isin"]); externalID = find(["id", "transaction id", "transaction_id", "id ordre", "order id"])
         status = find(["status", "statut"])
+        quoteCurrency = find(["currency (price / share)", "price_currency", "devise de cotation"])
         if date >= 0 && headers[date].lowercased() == "date" { time = find(["heure", "time"]) }
         fees = Set(headers.indices.filter {
             let name = headers[$0].lowercased()
@@ -118,6 +120,7 @@ public struct ImportedMovement: Identifiable, Sendable {
     public let isin: String
     public let externalID: String
     public let broker: ImportBroker
+    public let quoteCurrency: String
     public var cashMovement: Decimal {
         switch kind {
         case .buy, .withdrawal: return -amount - fees
@@ -157,18 +160,24 @@ public enum CSVImport {
         }
         guard TimeZone(identifier: mapping.timeZoneID) != nil else { throw ImportFailure("Fuseau horaire invalide.") }
         guard [".", ","].contains(mapping.decimalSeparator) else { throw ImportFailure("Séparateur décimal invalide.") }
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian); formatter.timeZone = TimeZone(identifier: mapping.timeZoneID)
+        formatter.dateFormat = mapping.dateFormat; formatter.isLenient = false
+        let isoFormatter = ISO8601DateFormatter()
         return table.rows.enumerated().map { offset, row in
-            do { return ImportLine(id: offset, movement: try parse(row, headers: table.headers, mapping: mapping, index: offset, now: now), issue: nil) }
+            do { return ImportLine(id: offset, movement: try parse(row, headers: table.headers, mapping: mapping, index: offset, now: now, formatter: formatter, isoFormatter: isoFormatter), issue: nil) }
             catch { return ImportLine(id: offset, movement: nil, issue: error.localizedDescription) }
         }
     }
-    private static func parse(_ row: [String], headers: [String], mapping m: CSVMapping, index: Int, now: Date) throws -> ImportedMovement {
+    private static func parse(_ row: [String], headers: [String], mapping m: CSVMapping, index: Int, now: Date,
+                              formatter: DateFormatter, isoFormatter: ISO8601DateFormatter) throws -> ImportedMovement {
         func text(_ column: Int) -> String { row.indices.contains(column) ? row[column].trimmingCharacters(in: .whitespacesAndNewlines) : "" }
         func decimal(_ column: Int, empty: Decimal? = nil, signed: Bool = false) throws -> Decimal {
             if text(column).isEmpty, let empty { return empty }
             let raw = text(column), negative = signed && text(column).hasPrefix("-")
             guard !raw.contains(m.decimalSeparator == "." ? "," : ".") else { throw ImportFailure("Séparateur décimal incompatible dans « \(row.indices.contains(column) ? headers[column] : "colonne absente") ». Les séparateurs de milliers ne sont pas acceptés.") }
-            guard let value = DecimalInput.parse(negative ? String(raw.dropFirst()) : raw) else { throw ImportFailure("Nombre invalide dans « \(row.indices.contains(column) ? headers[column] : "colonne absente") ». Pas de séparateur de milliers.") }
+            let hasSign = negative || (signed && raw.hasPrefix("+"))
+            guard let value = DecimalInput.parse(hasSign ? String(raw.dropFirst()) : raw) else { throw ImportFailure("Nombre invalide dans « \(row.indices.contains(column) ? headers[column] : "colonne absente") ». Pas de séparateur de milliers.") }
             return negative ? -value : value
         }
         if m.status >= 0 {
@@ -191,13 +200,10 @@ public enum CSVImport {
             guard let resolved = m.actionOverrides[text(m.kind)] ?? kinds[action] else { throw ImportFailure("Opération non prise en charge : \(text(m.kind)). Associez ce libellé explicitement ou corrigez le CSV.") }
             kind = resolved
         }
-        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian); formatter.timeZone = TimeZone(identifier: m.timeZoneID)
-        formatter.dateFormat = m.dateFormat; formatter.isLenient = false
         let parsedDate: Date?
         let dateText = text(m.date) + (m.time >= 0 ? " " + text(m.time) : "")
         if m.dateFormat == "yyyy-MM-dd'T'HH:mm:ssXXXXX" {
-            parsedDate = ISO8601DateFormatter().date(from: dateText)
+            parsedDate = isoFormatter.date(from: dateText)
         } else {
             parsedDate = formatter.date(from: dateText).flatMap { formatter.string(from: $0) == dateText ? $0 : nil }
         }
@@ -230,7 +236,7 @@ public enum CSVImport {
         let symbol = text(m.symbol).uppercased(), isin = text(m.isin).uppercased()
         guard !kind.needsInstrument || !symbol.isEmpty || !isin.isEmpty else { throw ImportFailure("Ticker ou ISIN requis.") }
         return ImportedMovement(id: index, date: date, kind: kind, amount: amount, fees: fees, quantity: quantity,
-                                currency: currency, symbol: symbol, isin: isin, externalID: text(m.externalID), broker: m.broker)
+                                currency: currency, symbol: symbol, isin: isin, externalID: text(m.externalID), broker: m.broker, quoteCurrency: text(m.quoteCurrency).uppercased())
     }
     public static func sameEconomics(_ lhs: LedgerEntry, _ rhs: LedgerEntry) -> Bool {
         lhs.date == rhs.date && lhs.kind == rhs.kind && lhs.instrumentID == rhs.instrumentID && lhs.currency == rhs.currency

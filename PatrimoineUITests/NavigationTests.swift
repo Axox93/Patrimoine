@@ -74,9 +74,13 @@ final class NavigationTests: XCTestCase {
                 if element.exists && element.isHittable { return }
                 app.swipeUp()
             }
-            XCTAssertTrue(element.exists)
+            if !element.exists || !element.isHittable {
+                capture(app, "Import-cible-introuvable")
+                let hierarchy = XCTAttachment(string: app.debugDescription); hierarchy.lifetime = .keepAlways; add(hierarchy)
+            }
+            XCTAssertTrue(element.exists && element.isHittable)
         }
-        func tap(_ title: String) { let button = app.buttons[title]; reveal(button); button.tap() }
+        func tap(_ title: String) { let button = app.buttons[title]; reveal(button); XCTAssertTrue(button.isEnabled); button.tap() }
         let portfolioPicker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Portefeuille de destination")).firstMatch
         XCTAssertTrue(portfolioPicker.waitForExistence(timeout: 10)); portfolioPicker.tap()
         app.buttons["Import fictif · Trading 212"].tap()
@@ -86,7 +90,9 @@ final class NavigationTests: XCTestCase {
         let zone = app.textFields["Fuseau des dates sans décalage"]
         reveal(zone); zone.tap(); zone.typeText("UTC")
         let reviewed = app.switches["J’ai vérifié le brut/net, le fuseau des dates et toutes les colonnes de frais dans la devise du compte"]
-        reveal(reviewed); reviewed.tap()
+        reveal(reviewed)
+        reviewed.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertEqual(reviewed.value as? String, "1")
         tap("Prévisualiser les opérations")
         tap("Vérifier les doublons et les soldes")
         tap("Confirmer l’importation")

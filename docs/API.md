@@ -32,8 +32,8 @@ Pour DEGIRO, Trade Republic et les banques françaises, privilégier les exports
 - Aucun endpoint de passage d’ordres, même si le fournisseur en propose.
 - Tests de succès, timeout, HTTP, quota, absence de données, identité ambiguë et réponse invalide.
 
-## Import à venir
+## Import local assisté
 
-L’import CSV générique sera la première étape, avec prévisualisation, mapping, validation stricte, rapprochement et confirmation avant écriture atomique. Le schéma métier doit préserver l’identifiant fournisseur, la source, l’empreinte, la devise et le compte. Deux opérations financières identiques ne sont pas nécessairement un doublon : toute incertitude exige une revue.
+Le parcours CSV propose Trading 212, Trade Republic et DEGIRO, avec correspondance des colonnes, prévisualisation, validation du journal, rapprochement et confirmation avant écriture atomique. Les identifiants déterministes sont dérivés du compte, de l’établissement sélectionné et de l’identifiant source. Deux identifiants source différents restent deux opérations distinctes ; sans identifiant fiable, une correspondance économique possible exige une revue.
 
-Excel et PDF nécessitent un choix de parseur et une validation sur des exemples anonymisés d’exports réels. Ils ne doivent pas être présentés comme disponibles dans cette tranche. Aucun fichier personnel ne doit être envoyé vers GitHub pour construire ces parseurs.
+PDFKit extrait localement le texte des PDF lisibles pour une transcription manuelle vers le CSV ; ce n’est pas une reconnaissance automatique des relevés des trois courtiers. Excel et les adaptateurs automatiques de relevés propriétaires restent à développer. Voir [le périmètre exact de l’import](IMPORT.md). Aucun relevé personnel ne doit être envoyé vers GitHub pour construire les adaptateurs.

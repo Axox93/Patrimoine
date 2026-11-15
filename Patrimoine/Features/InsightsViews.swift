@@ -125,7 +125,7 @@ struct InstrumentsView: View {
                 Button { selected = instrument } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(instrument.name).foregroundStyle(.primary)
-                        Text(instrument.symbol + " · " + instrument.exchange + " · EUR").font(.caption).foregroundStyle(.secondary)
+                        Text(instrument.symbol + " · " + instrument.exchange + " · " + instrument.currency).font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 6)
                 }
             }

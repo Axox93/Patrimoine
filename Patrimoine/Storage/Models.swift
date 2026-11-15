@@ -38,9 +38,9 @@ enum PatrimoineSchemaV1: VersionedSchema {
         var currency: String
         var kind: String
         var distribution: String
-        init(name: String, symbol: String, isin: String, exchange: String, kind: String, distribution: String) {
+        init(name: String, symbol: String, isin: String, exchange: String, kind: String, distribution: String, currency: String = "EUR") {
             id = UUID(); self.name = name; self.symbol = symbol; self.isin = isin
-            self.exchange = exchange; currency = "EUR"; self.kind = kind; self.distribution = distribution
+            self.exchange = exchange; self.currency = currency; self.kind = kind; self.distribution = distribution
         }
     }
 
@@ -116,7 +116,7 @@ enum StorageError: LocalizedError {
         switch self {
         case .corruptRecord: return "Une donnée locale est illisible. Les données ont été conservées."
         case .invalidName: return "Renseignez le nom et l’établissement."
-        case .incompatibleCurrency: return "Cette version prend en charge les comptes et instruments en euros uniquement."
+        case .incompatibleCurrency: return "Les mouvements et les valorisations doivent être comptabilisés en euros. Aucun change n’est calculé automatiquement."
         case .missingInstrument: return "Sélectionnez un instrument enregistré."
         case .accumulatingDividend: return "Un ETF capitalisant ne verse pas de dividende. Vérifiez sa politique de distribution."
         }

@@ -46,7 +46,6 @@ enum StoreFactory {
             guard let instrument = try context.fetch(FetchDescriptor<Instrument>()).first(where: { $0.id == entry.instrumentID }) else {
                 throw StorageError.missingInstrument
             }
-            guard instrument.currency == account.currency else { throw StorageError.incompatibleCurrency }
             if entry.kind == .dividend && instrument.distribution == "Capitalisant" { throw StorageError.accumulatingDividend }
         }
         _ = try LedgerEngine.replay(try entries.map { try $0.entry() } + [entry], currency: account.currency)

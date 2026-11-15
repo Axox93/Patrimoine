@@ -24,7 +24,7 @@ struct MovementForm: View {
                     if kind.needsInstrument {
                         Picker("Instrument", selection: $instrumentID) {
                             Text("Choisir").tag(UUID?.none)
-                            ForEach(instruments) { Text($0.name).tag(Optional($0.id)) }
+                            ForEach(instruments) { Text($0.name + " · " + $0.currency).tag(Optional($0.id)) }
                         }
                     }
                     if [.buy, .sell, .split].contains(kind) {
@@ -81,6 +81,7 @@ struct InstrumentForm: View {
     @State private var exchange = ""
     @State private var kind = "Action"
     @State private var distribution = "Non renseigné"
+    @State private var currency = "EUR"
     @State private var error: ErrorMessage?
     var body: some View {
         NavigationStack {
@@ -96,7 +97,9 @@ struct InstrumentForm: View {
                             Text("Non renseigné").tag("Non renseigné"); Text("Capitalisant").tag("Capitalisant"); Text("Distribuant").tag("Distribuant")
                         }
                     }
-                    LabeledContent("Devise de cotation", value: "EUR")
+                    Picker("Devise de cotation", selection: $currency) {
+                        ForEach(["EUR", "USD", "GBP", "GBX", "CHF", "JPY", "CAD", "AUD", "HKD"], id: \.self) { Text($0).tag($0) }
+                    }
                 }
                 Section {
                     Text("Vérifiez l’identité et la place de cotation auprès de votre courtier. Ces informations sont déclarées par vous et ne sont pas vérifiées par une source externe.")
@@ -121,9 +124,9 @@ struct InstrumentForm: View {
                   cleanISIN.isEmpty || cleanISIN.range(of: "^[A-Z]{2}[A-Z0-9]{9}[0-9]$", options: .regularExpression) != nil else {
                 throw FormError.invalidIdentity
             }
-            guard !instruments.contains(where: { $0.symbol == cleanSymbol && $0.exchange == cleanExchange }) else { throw FormError.duplicateInstrument }
+            guard !instruments.contains(where: { $0.symbol == cleanSymbol && $0.exchange == cleanExchange && $0.currency == currency }) else { throw FormError.duplicateInstrument }
             context.insert(Instrument(name: cleanName, symbol: cleanSymbol, isin: cleanISIN,
-                exchange: cleanExchange, kind: kind, distribution: kind == "ETF" ? distribution : "Non renseigné"))
+                exchange: cleanExchange, kind: kind, distribution: kind == "ETF" ? distribution : "Non renseigné", currency: currency))
             try AccountRepository.save(context); dismiss()
         } catch { self.error = ErrorMessage(error) }
     }
@@ -140,9 +143,9 @@ struct PriceForm: View {
         NavigationStack {
             Form {
                 Section(instrument.name) {
-                    TextField("Cours unitaire en EUR", text: $value).keyboardType(.decimalPad)
+                    TextField("Valeur d’un titre en EUR", text: $value).keyboardType(.decimalPad)
                     DatePicker("Date du cours", selection: $date, in: ...Date.now)
-                    Text("Recopiez un cours observé auprès d’une source fiable. Il sera identifié comme saisie manuelle, avec sa date. Il s’applique à cet instrument dans tous vos portefeuilles.")
+                    Text("Devise de cotation de l’instrument : \(instrument.currency). Saisissez sa valeur équivalente en euros depuis une source fiable, en effectuant vous-même la conversion si nécessaire. Aucun taux n’est calculé par l’application. Cette valeur déclarée, datée, s’applique à tous vos portefeuilles.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -153,7 +156,9 @@ struct PriceForm: View {
                     Button("Enregistrer") {
                         do {
                             guard let price = DecimalInput.parse(value) else { throw LedgerError.invalidAmount }
-                            context.insert(Price(instrumentID: instrument.id, value: price, date: date))
+                            let record = Price(instrumentID: instrument.id, value: price, date: date)
+                            if instrument.currency != "EUR" { record.source = "Valeur en EUR déclarée (cotation \(instrument.currency))" }
+                            context.insert(record)
                             try AccountRepository.save(context); dismiss()
                         } catch { self.error = ErrorMessage(error) }
                     }

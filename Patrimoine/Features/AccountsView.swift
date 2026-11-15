@@ -76,7 +76,7 @@ struct AccountForm: View {
                     LabeledContent("Devise", value: "EUR")
                 }
                 Section {
-                    Text("Le type sert au classement. Seul le suivi comptable manuel des liquidités, actions et ETF en euros est disponible dans cette version. Les règles fiscales et produits spécialisés ne sont pas encore calculés.")
+                    Text("Le type sert au classement. Le suivi comptable des liquidités, actions et ETF utilise des montants déjà exprimés en euros. Aucun taux de change, règle fiscale ou calcul propre aux produits spécialisés n’est fourni dans cette version.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -193,7 +193,7 @@ struct AssetRow: View {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(instrument.name).font(.headline)
-                    Text(instrument.symbol + " · " + instrument.exchange).font(.caption).foregroundStyle(.secondary)
+                    Text(instrument.symbol + " · " + instrument.exchange + " · " + instrument.currency).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Text(instrument.kind).font(.caption).foregroundStyle(.secondary)
@@ -203,7 +203,7 @@ struct AssetRow: View {
             MetricRow(title: "PRU, frais inclus", value: holding.averageCost)
             MetricRow(title: "Valeur déclarée", value: price.flatMap { DecimalInput.parse($0.valueText) }.map { holding.quantity * $0 })
             if let price {
-                Text("Saisie manuelle · " + price.observedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+                Text(price.source + " · " + price.observedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                 if Date.now.timeIntervalSince(price.observedAt) > 86400 { InlineIssue(message: "Cours datant de plus de 24 heures") }
             } else { InlineIssue(message: "Touchez pour saisir un cours réel et sa date.") }
         }

@@ -63,11 +63,15 @@ import PatrimoineCore
     }
     func testImportedBuyDividendAndPartialSaleReconstructPosition() throws {
         let (container, account) = try fixture(); let context = container.mainContext
-        let instrument = Instrument(name: "Action FICTIVE", symbol: "TEST", isin: "", exchange: "XPAR", kind: "Action", distribution: "Non renseigné")
+        let instrument = Instrument(name: "Action FICTIVE", symbol: "TEST", isin: "", exchange: "XNAS", kind: "Action", distribution: "Non renseigné", currency: "USD")
         context.insert(instrument); try context.save()
-        let table = try CSVTable("Time;Action;Total;Currency;Quantity;Ticker;Commission;ID\n2026-01-01 10:00:00;Deposit;1000;EUR;0;;0;FAKE-1\n2026-01-02 10:00:00;Market buy;102;EUR;2;TEST;2;FAKE-2\n2026-01-03 10:00:00;Dividend;8;EUR;0;TEST;2;FAKE-3\n2026-01-04 10:00:00;Market sell;58;EUR;1;TEST;2;FAKE-4")
+        let table = try CSVTable("Time;Action;Total;Currency;Quantity;Ticker;Commission;Currency (Price / share);ID\n2026-01-01 10:00:00;Deposit;1000;EUR;0;;0;;FAKE-1\n2026-01-02 10:00:00;Market buy;102;EUR;2;TEST;2;USD;FAKE-2\n2026-01-03 10:00:00;Dividend;8;EUR;0;TEST;2;USD;FAKE-3\n2026-01-04 10:00:00;Market sell;58;EUR;1;TEST;2;USD;FAKE-4")
         var mapping = CSVMapping(headers: table.headers); mapping.basis = .netCash
         let rows = try CSVImport.preview(table, mapping: mapping).map { try XCTUnwrap($0.movement, $0.issue ?? "") }
+        let wrong = Instrument(name: "Autre cotation FICTIVE", symbol: "TEST", isin: "", exchange: "XPAR", kind: "Action", distribution: "Non renseigné")
+        context.insert(wrong); try context.save()
+        XCTAssertThrowsError(try ImportRepository.commit(rows, account: account, instruments: ["TEST":wrong.id], allowSimilar: [], context: context))
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Movement>()), 0)
         XCTAssertEqual(try ImportRepository.commit(rows, account: account, instruments: ["TEST":instrument.id], allowSimilar: [], context: context), 4)
         let entries = try context.fetch(FetchDescriptor<Movement>()).map { try $0.entry() }
         let result = try LedgerEngine.replay(entries, currency: "EUR")
@@ -77,5 +81,21 @@ import PatrimoineCore
         XCTAssertEqual(result.realizedGain, 7)
         XCTAssertEqual(result.dividends, 8)
         XCTAssertEqual(result.valuation(prices: [instrument.id:70]), 1034)
+    }
+    func testThousandDistinctSourceIDsAndOverlap() throws {
+        let (container, account) = try fixture(); let context = container.mainContext
+        let text = (0..<1000).map { "2026-01-02 10:00:00;Deposit;1;EUR;BULK-FAKE-\($0)" }.joined(separator: "\n")
+        let movements = try rows(text)
+        XCTAssertEqual(try ImportRepository.commit(movements, account: account, instruments: [:], allowSimilar: [], context: context), 1000)
+        XCTAssertTrue(try ImportRepository.prepare(movements, account: account, instruments: [:], allowSimilar: [], context: context).allSatisfy(\.duplicate))
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Movement>()), 1000)
+    }
+    func testBrokerMismatchDoesNotImportIntoWrongAccount() throws {
+        let (container, account) = try fixture(); let context = container.mainContext
+        let table = try CSVTable("Time;Action;Total;Currency;ID\n2026-01-01 10:00:00;Deposit;100;EUR;FAKE-TR-1")
+        var mapping = CSVMapping(headers: table.headers, broker: .tradeRepublic); mapping.basis = .gross
+        let rows = try CSVImport.preview(table, mapping: mapping).map { try XCTUnwrap($0.movement) }
+        XCTAssertThrowsError(try ImportRepository.commit(rows, account: account, instruments: [:], allowSimilar: [], context: context))
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Movement>()), 0)
     }
 }
