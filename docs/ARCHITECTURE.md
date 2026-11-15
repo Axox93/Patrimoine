@@ -14,6 +14,7 @@ Application exclusivement iPhone, iOS 17+, Swift 5.9 ou plus récent en mode Swi
 | `Sources/PatrimoineCore` | Domaine financier pur Foundation, sans dépendance à SwiftUI/SwiftData |
 | `Tests` | Tests unitaires du moteur |
 | `PatrimoineTests` | Tests SwiftData sur simulateur iPhone |
+| `PatrimoineUITests` | Parcours natifs et captures sur simulateur iPhone |
 | `scripts` | Génération déterministe du projet, contrôles et empaquetage |
 
 ## Données
@@ -37,6 +38,8 @@ Le répertoire et les fichiers existants reçoivent `FileProtectionType.complete
 ## Sécurité
 
 Le verrouillage utilise `deviceOwnerAuthentication` (biométrie ou code du téléphone), avec invalidation d’une tentative lors du passage en arrière-plan. Une protection visuelle recouvre l’application dès qu’elle devient inactive. Le verrouillage est optionnel, désactivé au premier lancement et activé seulement après authentification réussie.
+
+L’ouverture du magasin est déclenchée lorsque la scène devient active. Les protections visuelles s’affichent au-dessus de l’interface pour préserver sa navigation ; les vues recouvertes sont exclues de l’accessibilité et des interactions.
 
 Les futures clés seront exclusivement stockées dans Keychain, accessibilité `WhenUnlockedThisDeviceOnly`. Aucun secret n’est actuellement demandé ni transmis. Le masquage des montants couvre les montants, quantités et graphiques ; les noms d’établissements restent visibles.
 

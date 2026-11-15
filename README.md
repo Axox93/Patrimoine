@@ -1,8 +1,16 @@
 # Patrimoine
 
+[![Build iOS](https://github.com/Axox93/Patrimoine/actions/workflows/build-ios.yml/badge.svg)](https://github.com/Axox93/Patrimoine/actions/workflows/build-ios.yml)
+
 Application personnelle **native iPhone**, SwiftUI et SwiftData, iOS 17 minimum. Pas de backend, abonnement, passage d’ordres ni dépendance tierce dans l’application.
 
 **Version de fondations 0.1.0** : le suivi est manuel et en euros. Les cours automatiques, connexions bancaires, imports, sauvegardes et analyses avancées ne sont pas encore disponibles. Les prix doivent être recopiés depuis une source réelle ; ils sont affichés comme saisies manuelles datées. Aucune donnée de démonstration n’est injectée dans l’application.
+
+**Build 5 vérifié** : [compilation et 19 tests réussis](https://github.com/Axox93/Patrimoine/actions/runs/43751555994), IPA non signé produit pour iPhone iOS 17+. Installation sur iPhone physique encore à valider.
+
+Captures natives issues des tests en simulateur, avec données fictives uniquement dans le scénario de test :
+
+<img src="docs/images/accueil-sombre.png" width="250" alt="Accueil sombre sans données" /> <img src="docs/images/pea-clair-test.png" width="250" alt="PEA clair avec un versement fictif de test" />
 
 ## Périmètre écrit
 
@@ -56,5 +64,6 @@ Les données locales sont exclues de la sauvegarde iCloud. L’export/restaurati
 - [Calculs financiers](docs/CALCULATIONS.md)
 - [Fournisseurs et limites](docs/API.md)
 - [Vérifications et avancement](docs/PROGRESS.md)
+- [Portée des tests et validations restant à faire](docs/TESTS.md)
 
 Code écrit, compilation réussie, test en simulateur et validation sur iPhone sont des états distincts. Consulter l’exécution GitHub et le rapport d’avancement pour les preuves disponibles.
