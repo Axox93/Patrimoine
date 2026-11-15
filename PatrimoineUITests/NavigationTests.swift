@@ -48,4 +48,13 @@ final class NavigationTests: XCTestCase {
         XCTAssertFalse(app.alerts["Opération refusée"].exists)
         capture(app, "PEA-clair-versement-fictif")
     }
+    func testImportEntryPoint() {
+        let app = launch("dark")
+        XCTAssertTrue(app.buttons["Créer un portefeuille"].waitForExistence(timeout: 45))
+        app.tabBars.buttons["Plus"].tap()
+        app.buttons["Importer un compte"].tap()
+        XCTAssertTrue(app.buttons["Choisir un CSV ou PDF"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Trading 212 · import manuel"].exists)
+        capture(app, "Import-Trading212")
+    }
 }

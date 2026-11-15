@@ -82,6 +82,7 @@ struct MoreView: View {
     var body: some View {
         List {
             Section("Votre espace") {
+                NavigationLink { ImportView() } label: { Label("Importer un compte", systemImage: "square.and.arrow.down") }
                 NavigationLink { InstrumentsView() } label: { Label("Instruments", systemImage: "list.bullet.rectangle") }
                 NavigationLink { TrashView() } label: { Label("Corbeille", systemImage: "trash") }
             }
@@ -97,7 +98,9 @@ struct MoreView: View {
             Section("État des intégrations") {
                 LabeledContent("Cours de marché", value: "Saisie manuelle")
                 LabeledContent("Banques et courtiers", value: "Non connectés")
-                LabeledContent("Import CSV / Excel / PDF", value: "À venir")
+                LabeledContent("Import CSV", value: "Avec validation")
+                LabeledContent("Relevé PDF", value: "Transcription assistée")
+                LabeledContent("Import Excel", value: "À venir")
                 LabeledContent("Sauvegarde chiffrée", value: "À venir")
                 Text("Cette version de fondations conserve les données uniquement sur cet iPhone. Elles ne sont pas synchronisées ni incluses dans la sauvegarde iCloud. Ne l’utilisez pas comme unique registre avant la validation de la sauvegarde et de la restauration.")
                     .font(.footnote).foregroundStyle(.secondary)
