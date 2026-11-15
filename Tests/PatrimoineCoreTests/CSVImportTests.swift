@@ -8,9 +8,44 @@ final class CSVImportTests: XCTestCase {
         XCTAssertEqual(table.rows, [["A, B", "line 1\nline \"2\""]])
     }
     func testMalformedCSVRejected() {
-        for csv in ["a,a\n1,2", "a,b\n1", "a,b\n\"unclosed", "a,b\n\"closed\"x,2", ""] {
+        for csv in ["a,b\n1", "a,b\n\"unclosed", "a,b\n\"closed\"x,2", ""] {
             XCTAssertThrowsError(try CSVTable(csv))
         }
+    }
+    func testDegiroRepeatedAndUnnamedColumnsArePreserved() throws {
+        let table = try CSVTable("Date;Valeur;;Valeur;\r\n02-01-2026;-100;USD;-90;EUR\r\n")
+        XCTAssertEqual(table.headers.count, 5)
+        XCTAssertEqual(Set(table.headers).count, 5)
+        XCTAssertEqual(table.rows[0], ["02-01-2026","-100","USD","-90","EUR"])
+    }
+    func testHeaderDelimiterInsideQuotesDoesNotChangeDialect() throws {
+        let table = try CSVTable("\"Name; description; label\",Amount\nTest,10")
+        XCTAssertEqual(table.headers.count, 2)
+    }
+    func testTradeRepublicSignedAmountsExplicitActionAndStatus() throws {
+        let table = try CSVTable("booking_date;booking_type;amount;currency;transaction_id;status\n2026-01-02T10:00:00Z;TRANSFER_IN;100;EUR;FAKE-TR-1;completed")
+        var mapping = CSVMapping(headers: table.headers, broker: .tradeRepublic)
+        mapping.basis = .netCash; mapping.signedAmounts = true
+        mapping.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
+        XCTAssertNotNil(try CSVImport.preview(table, mapping: mapping)[0].issue)
+        mapping.actionOverrides["TRANSFER_IN"] = .deposit
+        let row = try XCTUnwrap(CSVImport.preview(table, mapping: mapping)[0].movement)
+        XCTAssertEqual(row.amount, 100); XCTAssertEqual(row.broker, .tradeRepublic)
+        let cancelled = try CSVTable("booking_date;booking_type;amount;currency;status\n2026-01-02T10:00:00Z;TRANSFER_IN;100;EUR;pending")
+        var cancelledMap = CSVMapping(headers: cancelled.headers, broker: .tradeRepublic)
+        cancelledMap.basis = .gross; cancelledMap.dateFormat = mapping.dateFormat; cancelledMap.actionOverrides = mapping.actionOverrides
+        XCTAssertNotNil(try CSVImport.preview(cancelled, mapping: cancelledMap)[0].issue)
+    }
+    func testDegiroSignedQuantityAndSeparateTime() throws {
+        let table = try CSVTable("Date;Heure;ISIN;Quantité;Montant;Devise;Frais;ID\n02-01-2026;10:00;FR0000000001;2;-102;EUR;-2;FAKE-DG-1\n03-01-2026;11:00;FR0000000001;-1;60;EUR;0;FAKE-DG-2")
+        var mapping = CSVMapping(headers: table.headers, broker: .degiro)
+        mapping.basis = .netCash; mapping.signedAmounts = true; mapping.inferTradesFromQuantity = true
+        mapping.dateFormat = "dd-MM-yyyy HH:mm"
+        let rows = try CSVImport.preview(table, mapping: mapping)
+        let buy = try XCTUnwrap(rows[0].movement), sell = try XCTUnwrap(rows[1].movement)
+        XCTAssertEqual(buy.kind, .buy); XCTAssertEqual(buy.amount, 100); XCTAssertEqual(buy.fees, 2)
+        XCTAssertEqual(sell.kind, .sell); XCTAssertEqual(sell.quantity, 1)
+        XCTAssertEqual(buy.broker, .degiro)
     }
     private func parse(_ action: String = "Market buy", total: String = "102", currency: String = "EUR", date: String = "2026-01-02 10:00:00", feeCurrency: String = "EUR", basis: ImportAmountBasis = .netCash) throws -> ImportedMovement {
         let table = try CSVTable("Action;Time;ID;Ticker;No. of shares;Total;Currency (Total);Commission;Currency (Commission)\n\(action);\(date);FAKE-1;TEST;2;\(total);\(currency);2;\(feeCurrency)\n")

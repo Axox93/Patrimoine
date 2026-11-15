@@ -9,6 +9,7 @@ struct ImportView: View {
     @Query(sort: \Account.name) private var accounts: [Account]
     @Query(sort: \Instrument.name) private var instruments: [Instrument]
     @State private var accountID: UUID?
+    @State private var broker: ImportBroker = .trading212
     @State private var chooseFile = false
     @State private var source = ""
     @State private var pdfText = ""
@@ -35,10 +36,12 @@ struct ImportView: View {
     var body: some View {
         Form {
             Section {
-                Text("Trading 212 · import manuel").font(.headline)
+                Text(broker.rawValue + " · import manuel").font(.headline)
+                Picker("Établissement du fichier", selection: $broker) { ForEach(ImportBroker.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+                Text(broker.guidance).font(.footnote).foregroundStyle(.secondary)
                 Text("Exportez l’historique complet : ordres, versements, retraits, dividendes et intérêts. Chaque nouvel import met à jour le portefeuille après votre validation. Le fichier reste sur l’iPhone.")
                     .font(.footnote).foregroundStyle(.secondary)
-                Link("Comment exporter l’historique Trading 212", destination: URL(string: "https://helpcentre.trading212.com/hc/en-us/articles/360016898917-Can-I-export-the-trading-data-from-my-account")!)
+                Link("Consulter l’aide officielle de " + broker.rawValue, destination: broker.helpURL)
                 Picker("Portefeuille de destination", selection: $accountID) {
                     Text("Choisir un portefeuille").tag(UUID?.none)
                     ForEach(activeAccounts) { Text($0.name + " · " + $0.institution).tag(Optional($0.id)) }
@@ -129,17 +132,22 @@ struct ImportView: View {
             }
         }
         .sheet(isPresented: $showInstrument) { InstrumentForm() }
-        .confirmationDialog("Importer dans \(account?.name ?? "le portefeuille") ?", isPresented: $confirm, titleVisibility: .visible) {
+        .confirmationDialog("Importer \(broker.rawValue) dans \(account?.name ?? "le portefeuille") ?", isPresented: $confirm, titleVisibility: .visible) {
             Button("Importer les nouvelles opérations", action: commit)
         } message: { Text("Les opérations et les frais affichés seront enregistrés ensemble. L’historique existant sera conservé.") }
         .alert(item: $error) { Alert(title: Text("Import non effectué"), message: Text($0.text)) }
         .onChange(of: accountID) { _, _ in prepared = []; success = nil }
+        .onChange(of: broker) { _, newBroker in
+            if let table { mapping = CSVMapping(headers: table.headers, broker: newBroker); mapping.timeZoneID = "" }
+            feesConfirmed = false; invalidate()
+        }
         .onChange(of: source) { _, _ in table = nil; lines = []; prepared = []; success = nil }
     }
 
     @ViewBuilder private func mappingSection(_ table: CSVTable) -> some View {
         Section("Vérifier les colonnes") {
             column("Date", binding: $mapping.date, table: table)
+            column("Heure séparée (facultative)", binding: $mapping.time, table: table)
             column("Type d’opération", binding: $mapping.kind, table: table)
             column("Montant total", binding: $mapping.amount, table: table)
             column("Devise du montant", binding: $mapping.currency, table: table)
@@ -147,9 +155,31 @@ struct ImportView: View {
             column("Ticker", binding: $mapping.symbol, table: table)
             column("ISIN", binding: $mapping.isin, table: table)
             column("Identifiant de transaction", binding: $mapping.externalID, table: table)
+            column("Statut (si disponible)", binding: $mapping.status, table: table)
+            if mapping.currency < 0 {
+                Picker("Devise de la colonne montant", selection: $mapping.fixedCurrency) {
+                    Text("À confirmer").tag(""); Text("EUR : montants déjà en euros").tag("EUR")
+                }
+            }
+            Toggle("Montants signés : sorties négatives, entrées positives", isOn: $mapping.signedAmounts).font(.footnote)
+            if broker == .degiro {
+                Toggle("Relevé Transactions : quantité positive = achat, négative = vente", isOn: $mapping.inferTradesFromQuantity).font(.footnote)
+            }
+            if !mapping.inferTradesFromQuantity && table.headers.indices.contains(mapping.kind) {
+                DisclosureGroup("Vérifier les libellés d’opérations") {
+                    let actions = Array(Set(table.rows.map { $0[mapping.kind].trimmingCharacters(in: .whitespacesAndNewlines) })).sorted()
+                    ForEach(Array(actions.prefix(100)), id: \.self) { action in
+                        Picker(action.isEmpty ? "Libellé vide" : action, selection: Binding(get: { mapping.actionOverrides[action] }, set: { mapping.actionOverrides[action] = $0 })) {
+                            Text("Reconnaissance stricte du libellé").tag(MovementKind?.none)
+                            ForEach(MovementKind.allCases.filter { $0 != .split }, id: \.self) { Text($0.label).tag(Optional($0)) }
+                        }
+                    }
+                    if actions.count > 100 { Text("Plus de 100 libellés distincts : normalisez la colonne Type dans le CSV avant de continuer.").font(.caption) }
+                }
+            }
             Picker("Sens du montant", selection: $mapping.basis) { ForEach(ImportAmountBasis.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
             Picker("Format de date", selection: $mapping.dateFormat) {
-                ForEach(["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ssXXXXX"], id: \.self) { Text($0).tag($0) }
+                ForEach(["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd", "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy HH:mm", "dd-MM-yyyy", "dd-MM-yyyy HH:mm", "yyyy-MM-dd'T'HH:mm:ssXXXXX"], id: \.self) { Text($0).tag($0) }
             }
             TextField("Fuseau des dates sans décalage", text: $mapping.timeZoneID).textInputAutocapitalization(.never).autocorrectionDisabled()
             ForEach(table.headers.indices, id: \.self) { index in
@@ -160,18 +190,7 @@ struct ImportView: View {
             Toggle("J’ai vérifié le brut/net, le fuseau des dates et toutes les colonnes de frais dans la devise du compte", isOn: $feesConfirmed).font(.footnote)
             Button("Prévisualiser les opérations", action: preview).disabled(!feesConfirmed)
         }
-        .onChange(of: mapping.date) { _, _ in invalidate() }
-        .onChange(of: mapping.kind) { _, _ in invalidate() }
-        .onChange(of: mapping.amount) { _, _ in invalidate() }
-        .onChange(of: mapping.currency) { _, _ in invalidate() }
-        .onChange(of: mapping.quantity) { _, _ in invalidate() }
-        .onChange(of: mapping.symbol) { _, _ in invalidate() }
-        .onChange(of: mapping.isin) { _, _ in invalidate() }
-        .onChange(of: mapping.externalID) { _, _ in invalidate() }
-        .onChange(of: mapping.basis) { _, _ in invalidate() }
-        .onChange(of: mapping.dateFormat) { _, _ in invalidate() }
-        .onChange(of: mapping.timeZoneID) { _, _ in invalidate() }
-        .onChange(of: mapping.fees) { _, _ in invalidate() }
+        .onChange(of: mapping) { _, _ in invalidate() }
         .onChange(of: feesConfirmed) { _, value in if !value { invalidate() } }
     }
     private func column(_ title: String, binding: Binding<Int>, table: CSVTable) -> some View {
@@ -182,13 +201,28 @@ struct ImportView: View {
     }
     private func invalidate() { lines = []; prepared = []; success = nil }
     private func readColumns() {
-        do { let table = try CSVTable(source); self.table = table; mapping = CSVMapping(headers: table.headers); mapping.timeZoneID = ""; feesConfirmed = false; invalidate() }
-        catch { self.error = ErrorMessage(error) }
+        let text = source
+        busy = true
+        Task {
+            do {
+                let result = try await Task.detached(priority: .userInitiated) { try CSVTable(text) }.value
+                table = result; mapping = CSVMapping(headers: result.headers, broker: broker); mapping.timeZoneID = ""
+                feesConfirmed = false; invalidate()
+            } catch { self.error = ErrorMessage(error) }
+            busy = false
+        }
     }
     private func preview() {
         guard let table, feesConfirmed else { return }
-        do { lines = try CSVImport.preview(table, mapping: mapping); excluded = []; includeSimilar = []; prepared = []; success = nil }
-        catch { self.error = ErrorMessage(error) }
+        let configuration = mapping
+        busy = true
+        Task {
+            do {
+                lines = try await Task.detached(priority: .userInitiated) { try CSVImport.preview(table, mapping: configuration) }.value
+                excluded = []; includeSimilar = []; prepared = []; success = nil
+            } catch { self.error = ErrorMessage(error) }
+            busy = false
+        }
     }
     private func validRows() throws -> (Account, [ImportedMovement]) {
         guard let account else { throw ImportFailure("Choisissez un portefeuille de destination.") }
@@ -229,7 +263,7 @@ struct ImportView: View {
                     if url.pathExtension.lowercased() == "pdf" {
                         guard let pdf = PDFDocument(data: data), !pdf.isLocked, pdf.pageCount <= 100,
                               let text = pdf.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                              text.utf8.count <= 1_000_000 else { throw ImportFailure("Ce PDF est protégé, scanné, trop long ou sans texte exploitable. Utilisez l’export CSV de Trading 212.") }
+                              text.utf8.count <= 1_000_000 else { throw ImportFailure("Ce PDF est protégé, scanné, trop long ou sans texte exploitable. Utilisez un CSV de votre établissement.") }
                         return ("", text)
                     }
                     guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16) else { throw ImportFailure("Encodage non reconnu. Exportez en UTF-8.") }
