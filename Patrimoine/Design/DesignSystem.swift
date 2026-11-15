@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum Palette {
-    static let background = Color(uiColor: .systemGroupedBackground)
-    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
+    static let background = Color("BackgroundColor")
+    static let surface = Color("SurfaceColor")
     static let accent = Color("AccentColor")
     static let positive = Color("PositiveColor")
 }

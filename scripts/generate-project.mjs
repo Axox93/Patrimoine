@@ -45,7 +45,7 @@ add('appTarget', `isa = PBXNativeTarget; buildConfigurationList = ${id('appConfi
 add('testTarget', `isa = PBXNativeTarget; buildConfigurationList = ${id('testConfigs')}; buildPhases = ${list([id('testSources'), id('testFrameworks')])}; buildRules = (); dependencies = ${list([id('testDependency')])}; name = PatrimoineTests; packageProductDependencies = ${list([id('testPackage')])}; productName = PatrimoineTests; productReference = ${id('testProduct')}; productType = "com.apple.product-type.bundle.unit-test";`);
 for (const scope of ['project', 'app', 'test']) {
   for (const config of ['Debug', 'Release']) {
-    const common = `IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES;`;
+    const common = `IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; ONLY_ACTIVE_ARCH = ${config === 'Debug' ? 'YES' : 'NO'};`;
     const projectSettings = `${common} ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_OBJC_ARC = YES; ENABLE_TESTABILITY = ${config === 'Debug' ? 'YES' : 'NO'}; DEBUG_INFORMATION_FORMAT = ${config === 'Debug' ? 'dwarf' : '"dwarf-with-dsym"'}; SWIFT_OPTIMIZATION_LEVEL = ${config === 'Debug' ? '"-Onone"' : '"-O"'}; SWIFT_ACTIVE_COMPILATION_CONDITIONS = ${config === 'Debug' ? 'DEBUG' : '""'};`;
     const targetSettings = `${common} PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0;`;
     const settings = scope === 'project' ? projectSettings : scope === 'app'
@@ -70,9 +70,9 @@ fs.writeFileSync(path.join(projectDir, 'xcshareddata/xcschemes/Patrimoine.xcsche
 </Scheme>\n`);
 
 // Original geometric app icon, generated without an external graphics dependency.
-const size = 1024, pixels = Buffer.alloc((size * 4 + 1) * size);
+const size = 1024, pixels = Buffer.alloc((size * 3 + 1) * size);
 for (let y = 0; y < size; y++) {
-  const row = y * (size * 4 + 1); pixels[row] = 0;
+  const row = y * (size * 3 + 1); pixels[row] = 0;
   for (let x = 0; x < size; x++) {
     let color = [17, 39, 32];
     const bars = [[248, 478, 366, 722], [453, 350, 571, 722], [658, 222, 776, 722]];
@@ -83,8 +83,8 @@ for (let y = 0; y < size; y++) {
     };
     if (bars.some(rect => roundRect(...rect, 34))) color = [188, 216, 169];
     if (roundRect(248, 775, 776, 804, 14)) color = [109, 145, 118];
-    const index = row + 1 + x * 4;
-    pixels[index] = color[0]; pixels[index+1] = color[1]; pixels[index+2] = color[2]; pixels[index+3] = 255;
+    const index = row + 1 + x * 3;
+    pixels[index] = color[0]; pixels[index+1] = color[1]; pixels[index+2] = color[2];
   }
 }
 function crc32(buffer) {
@@ -97,7 +97,7 @@ function chunk(type, data) {
   length.writeUInt32BE(data.length); crc.writeUInt32BE(crc32(Buffer.concat([typeBytes,data])));
   return Buffer.concat([length,typeBytes,data,crc]);
 }
-const header = Buffer.alloc(13); header.writeUInt32BE(size,0); header.writeUInt32BE(size,4); header[8]=8;header[9]=6;
+const header = Buffer.alloc(13); header.writeUInt32BE(size,0); header.writeUInt32BE(size,4); header[8]=8;header[9]=2;
 const png = Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',zlib.deflateSync(pixels)),chunk('IEND',Buffer.alloc(0))]);
 const iconDir = path.join(root,'Patrimoine/Resources/Assets.xcassets/AppIcon.appiconset');
 fs.mkdirSync(iconDir,{recursive:true});fs.writeFileSync(path.join(iconDir,'AppIcon.png'),png);
