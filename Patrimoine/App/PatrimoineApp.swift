@@ -9,12 +9,9 @@ import SwiftData
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if scenePhase != .active {
-                    PrivacyCover()
-                } else if lock.enabled && !lock.unlocked {
-                    LockScreen().environment(lock)
-                } else if let container {
+            ZStack {
+                Group {
+                if let container {
                     RootView().modelContainer(container).environment(lock)
                 } else if storageIssue {
                     VStack(spacing: 24) {
@@ -25,10 +22,20 @@ import SwiftData
                 } else {
                     ProgressView("Ouverture du coffre local…")
                 }
+                }
+                .accessibilityHidden(scenePhase != .active || (lock.enabled && !lock.unlocked))
+                .allowsHitTesting(scenePhase == .active && (!lock.enabled || lock.unlocked))
+                if scenePhase != .active {
+                    PrivacyCover()
+                } else if lock.enabled && !lock.unlocked {
+                    LockScreen().environment(lock)
+                }
             }
             .tint(Palette.accent)
             .preferredColorScheme(testColorScheme)
-            .task { if container == nil { loadStore() } }
+            .task(id: scenePhase) {
+                if scenePhase == .active && container == nil && !storageIssue { loadStore() }
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { lock.lock() }
             }

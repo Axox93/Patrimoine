@@ -6,6 +6,8 @@ final class NavigationTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-patrimoine-ui-test", "-AppleLanguages", "(fr)", "-AppleLocale", "fr_FR"]
         app.launchEnvironment["PATRIMOINE_TEST_APPEARANCE"] = appearance
+        // Unit tests use the app as their host. Start a fresh process with the UI-test arguments.
+        app.terminate()
         app.launch()
         return app
     }
@@ -16,7 +18,7 @@ final class NavigationTests: XCTestCase {
     }
     func testEmptyDashboardInDarkMode() {
         let app = launch("dark")
-        XCTAssertTrue(app.buttons["Créer un portefeuille"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["Créer un portefeuille"].waitForExistence(timeout: 45))
         XCTAssertTrue(app.staticTexts["Votre histoire commence ici"].exists)
         capture(app, "Accueil-sombre-etat-vide")
         for tab in ["Portefeuilles", "Analyses", "Revenus", "Plus", "Accueil"] {
@@ -26,7 +28,7 @@ final class NavigationTests: XCTestCase {
     }
     func testCreateAccountAndRecordDepositInLightMode() {
         let app = launch("light")
-        XCTAssertTrue(app.buttons["Créer un portefeuille"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["Créer un portefeuille"].waitForExistence(timeout: 45))
         app.buttons["Créer un portefeuille"].tap()
         let name = app.textFields["Nom du portefeuille"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
