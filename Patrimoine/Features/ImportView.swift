@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
-import PDFKit
 import PatrimoineCore
 
 struct ImportView: View {
@@ -28,6 +27,7 @@ struct ImportView: View {
     @State private var busy = false
     @State private var feesConfirmed = false
     @State private var balanceValidated = false
+    @AppStorage("privacy.hideAmounts") private var hideAmounts = false
     private var activeAccounts: [Account] { accounts.filter { !$0.archived && $0.deletedAt == nil } }
     private var account: Account? { activeAccounts.first { $0.id == accountID } }
     private var selected: [ImportedMovement] { lines.filter { !excluded.contains($0.id) }.compactMap(\.movement) }
@@ -95,6 +95,7 @@ struct ImportView: View {
                                         Text("\(row.kind.label) · \(row.instrumentKey)").font(.subheadline.weight(.semibold))
                                         Text(row.date, format: .dateTime.day().month().year().hour().minute()).font(.caption)
                                         HStack { MoneyText(value: row.amount); Text("brut · frais").font(.caption); MoneyText(value: row.fees) }
+                                        MetricRow(title: "Mouvement de liquidités", value: row.cashMovement)
                                         if row.quantity > 0 { Text("Quantité : \(row.quantity.formatted())").font(.caption) }
                                     }
                                 } else { Text("Ligne \(line.id + 2) : \(line.issue ?? "invalide")").font(.footnote).foregroundStyle(.orange) }
@@ -125,6 +126,20 @@ struct ImportView: View {
         }
         .navigationTitle("Importer un compte").navigationBarTitleDisplayMode(.inline)
         .disabled(busy)
+        .scrollDismissesKeyboard(.immediately)
+        .accessibilityHidden(hideAmounts)
+        .allowsHitTesting(!hideAmounts)
+        .overlay {
+            if hideAmounts {
+                ZStack {
+                    Palette.background.ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        Text("Le fichier contient vos montants et vos opérations.").multilineTextAlignment(.center)
+                        Button("Afficher pour vérifier l’import") { hideAmounts = false }.buttonStyle(PrimaryButtonStyle())
+                    }.padding(24)
+                }
+            }
+        }
         .fileImporter(isPresented: $chooseFile, allowedContentTypes: [.commaSeparatedText, .tabSeparatedText, .plainText, .pdf], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls): if let url = urls.first { load(url) }
@@ -142,6 +157,14 @@ struct ImportView: View {
             feesConfirmed = false; invalidate()
         }
         .onChange(of: source) { _, _ in table = nil; lines = []; prepared = []; success = nil }
+        .task {
+            #if DEBUG
+            if source.isEmpty, ProcessInfo.processInfo.arguments.contains("-patrimoine-ui-test"),
+               let fixture = ProcessInfo.processInfo.environment["PATRIMOINE_TEST_CSV"] {
+                source = fixture; filename = "Jeu fictif de test d’interface"
+            }
+            #endif
+        }
     }
 
     @ViewBuilder private func mappingSection(_ table: CSVTable) -> some View {
@@ -178,6 +201,9 @@ struct ImportView: View {
                 }
             }
             Picker("Sens du montant", selection: $mapping.basis) { ForEach(ImportAmountBasis.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+            Picker("Séparateur décimal", selection: $mapping.decimalSeparator) {
+                Text("Point : 1234.56").tag("."); Text("Virgule : 1234,56").tag(",")
+            }
             Picker("Format de date", selection: $mapping.dateFormat) {
                 ForEach(["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd", "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy HH:mm", "dd-MM-yyyy", "dd-MM-yyyy HH:mm", "yyyy-MM-dd'T'HH:mm:ssXXXXX"], id: \.self) { Text($0).tag($0) }
             }
@@ -253,24 +279,9 @@ struct ImportView: View {
         busy = true; error = nil; success = nil
         Task {
             do {
-                let result = try await Task.detached(priority: .userInitiated) { () throws -> (String, String) in
-                    let granted = url.startAccessingSecurityScopedResource()
-                    defer { if granted { url.stopAccessingSecurityScopedResource() } }
-                    let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-                    guard size <= 5_000_000 else { throw ImportFailure("Document trop volumineux (5 Mo maximum).") }
-                    let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                    guard data.count <= 5_000_000 else { throw ImportFailure("Document trop volumineux.") }
-                    if url.pathExtension.lowercased() == "pdf" {
-                        guard let pdf = PDFDocument(data: data), !pdf.isLocked, pdf.pageCount <= 100,
-                              let text = pdf.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                              text.utf8.count <= 1_000_000 else { throw ImportFailure("Ce PDF est protégé, scanné, trop long ou sans texte exploitable. Utilisez un CSV de votre établissement.") }
-                        return ("", text)
-                    }
-                    guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16) else { throw ImportFailure("Encodage non reconnu. Exportez en UTF-8.") }
-                    return (text, "")
-                }.value
-                filename = url.lastPathComponent; pdfText = result.1
-                source = result.0.isEmpty ? "Date;Type;Montant;Devise;Quantité;Ticker;ISIN;Frais;ID\n" : result.0
+                let result = try await Task.detached(priority: .userInitiated) { try ImportDocumentReader.read(url) }.value
+                filename = url.lastPathComponent; pdfText = result.pdfText
+                source = result.csv.isEmpty ? "Date;Type;Montant;Devise;Quantité;Ticker;ISIN;Frais;ID\n" : result.csv
                 table = nil; lines = []; prepared = []; links = [:]; excluded = []; includeSimilar = []
             } catch { self.error = ErrorMessage(error) }
             busy = false

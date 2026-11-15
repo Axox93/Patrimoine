@@ -87,8 +87,15 @@ final class CSVImportTests: XCTestCase {
     }
     func testFrenchDecimalsAndTabSeparator() throws {
         let table = try CSVTable("Time\tAction\tTotal\tCurrency\n2026-01-02 10:00:00\tDeposit\t12,50\tEUR")
-        var mapping = CSVMapping(headers: table.headers); mapping.basis = .gross
+        var mapping = CSVMapping(headers: table.headers); mapping.basis = .gross; mapping.decimalSeparator = ","
         let row = try XCTUnwrap(CSVImport.preview(table, mapping: mapping).first?.movement)
         XCTAssertEqual(row.amount, Decimal(string: "12.50"))
+    }
+    func testDecimalConventionPreventsThousandsGuessing() throws {
+        let table = try CSVTable("Time;Action;Total;Currency\n2026-01-02 10:00:00;Deposit;1,234;EUR")
+        var mapping = CSVMapping(headers: table.headers); mapping.basis = .gross
+        XCTAssertNotNil(try CSVImport.preview(table, mapping: mapping)[0].issue)
+        mapping.decimalSeparator = ","
+        XCTAssertEqual(try CSVImport.preview(table, mapping: mapping)[0].movement?.amount, Decimal(string: "1.234"))
     }
 }

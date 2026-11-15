@@ -83,6 +83,7 @@ public struct CSVMapping: Sendable, Equatable {
     public var signedAmounts = false
     public var inferTradesFromQuantity = false
     public var fixedCurrency = ""
+    public var decimalSeparator = "."
     public var actionOverrides: [String: MovementKind] = [:]
     public var fees: Set<Int> = []
     public var dateFormat = "yyyy-MM-dd HH:mm:ss"
@@ -117,6 +118,14 @@ public struct ImportedMovement: Identifiable, Sendable {
     public let isin: String
     public let externalID: String
     public let broker: ImportBroker
+    public var cashMovement: Decimal {
+        switch kind {
+        case .buy, .withdrawal: return -amount - fees
+        case .sell, .deposit, .dividend, .interest: return amount - fees
+        case .fee: return -amount
+        case .split: return 0
+        }
+    }
     public var instrumentKey: String { isin.isEmpty ? symbol : isin }
     public func ledgerEntry(accountID: UUID, instrumentID: UUID?, sequence: Int, forceNewID: Bool = false) -> LedgerEntry {
         var identity = UUID()
@@ -147,6 +156,7 @@ public enum CSVImport {
             throw ImportFailure("Choisissez les colonnes requises et confirmez si le montant est brut ou net.")
         }
         guard TimeZone(identifier: mapping.timeZoneID) != nil else { throw ImportFailure("Fuseau horaire invalide.") }
+        guard [".", ","].contains(mapping.decimalSeparator) else { throw ImportFailure("Séparateur décimal invalide.") }
         return table.rows.enumerated().map { offset, row in
             do { return ImportLine(id: offset, movement: try parse(row, headers: table.headers, mapping: mapping, index: offset, now: now), issue: nil) }
             catch { return ImportLine(id: offset, movement: nil, issue: error.localizedDescription) }
@@ -157,6 +167,7 @@ public enum CSVImport {
         func decimal(_ column: Int, empty: Decimal? = nil, signed: Bool = false) throws -> Decimal {
             if text(column).isEmpty, let empty { return empty }
             let raw = text(column), negative = signed && text(column).hasPrefix("-")
+            guard !raw.contains(m.decimalSeparator == "." ? "," : ".") else { throw ImportFailure("Séparateur décimal incompatible dans « \(row.indices.contains(column) ? headers[column] : "colonne absente") ». Les séparateurs de milliers ne sont pas acceptés.") }
             guard let value = DecimalInput.parse(negative ? String(raw.dropFirst()) : raw) else { throw ImportFailure("Nombre invalide dans « \(row.indices.contains(column) ? headers[column] : "colonne absente") ». Pas de séparateur de milliers.") }
             return negative ? -value : value
         }
