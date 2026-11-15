@@ -1,0 +1,81 @@
+import SwiftUI
+import SwiftData
+
+@main struct PatrimoineApp: App {
+    @State private var lock = AppLock()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var container: ModelContainer?
+    @State private var storageIssue = false
+
+    var body: some Scene {
+        WindowGroup {
+            Group {
+                if scenePhase != .active {
+                    PrivacyCover()
+                } else if lock.enabled && !lock.unlocked {
+                    LockScreen().environment(lock)
+                } else if let container {
+                    RootView().modelContainer(container).environment(lock)
+                } else if storageIssue {
+                    VStack(spacing: 24) {
+                        EmptyStateView(title: "Données temporairement indisponibles",
+                            message: "Le stockage n’a pas pu être ouvert. Aucune donnée n’a été effacée. Déverrouillez l’iPhone puis réessayez.", symbol: "lock.shield")
+                        Button("Réessayer", action: loadStore).buttonStyle(.borderedProminent)
+                    }.padding(24)
+                } else {
+                    ProgressView("Ouverture du coffre local…")
+                }
+            }
+            .tint(Palette.accent)
+            .task { if container == nil { loadStore() } }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background { lock.lock() }
+            }
+        }
+    }
+    @MainActor private func loadStore() {
+        do { container = try StoreFactory.make(); storageIssue = false }
+        catch { storageIssue = true }
+    }
+}
+
+struct PrivacyCover: View {
+    var body: some View {
+        ZStack {
+            Palette.background.ignoresSafeArea()
+            VStack(spacing: 18) {
+                Image(systemName: "square.stack.3d.up.fill").font(.largeTitle).foregroundStyle(Palette.accent)
+                Text("PATRIMOINE").font(.caption.weight(.bold)).tracking(4)
+            }
+        }
+    }
+}
+
+struct LockScreen: View {
+    @Environment(AppLock.self) private var lock
+    var body: some View {
+        ZStack {
+            Palette.background.ignoresSafeArea()
+            VStack(spacing: 24) {
+                EmptyStateView(title: "Votre patrimoine, à l’abri",
+                    message: "Authentifiez-vous pour consulter vos comptes.", symbol: "lock.shield")
+                Button { Task { await lock.authenticate() } } label: {
+                    Label("Déverrouiller", systemImage: "faceid").frame(minHeight: 44)
+                }.buttonStyle(.borderedProminent).disabled(lock.authenticating)
+                if let message = lock.message { Text(message).font(.footnote).foregroundStyle(.secondary) }
+            }.padding(24)
+        }
+    }
+}
+
+struct RootView: View {
+    var body: some View {
+        TabView {
+            NavigationStack { DashboardView() }.tabItem { Label("Accueil", systemImage: "square.grid.2x2") }
+            NavigationStack { AccountsView() }.tabItem { Label("Portefeuilles", systemImage: "wallet.pass") }
+            NavigationStack { AnalysisView() }.tabItem { Label("Analyses", systemImage: "chart.pie") }
+            NavigationStack { IncomeView() }.tabItem { Label("Revenus", systemImage: "calendar") }
+            NavigationStack { MoreView() }.tabItem { Label("Plus", systemImage: "ellipsis") }
+        }
+    }
+}

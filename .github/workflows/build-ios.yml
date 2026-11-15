@@ -1,0 +1,102 @@
+name: Build iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Patrimoine/**'
+      - 'PatrimoineTests/**'
+      - 'Patrimoine.xcodeproj/**'
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Package.swift'
+      - 'scripts/**'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch:
+    inputs:
+      signing:
+        description: 'Mode de signature Apple'
+        type: choice
+        options: [unsigned, signed]
+        default: unsigned
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      SIGNING_MODE: ${{ inputs.signing || 'unsigned' }}
+      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID || 'fr.patrimoine.personal' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use the stable default supplied by the pinned macOS image, or an explicit repository variable.
+          if [[ -n "${REQUESTED_XCODE:-}" ]]; then
+            [[ "$REQUESTED_XCODE" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
+            sudo xcode-select -s "/Applications/Xcode_${REQUESTED_XCODE}.app/Contents/Developer"
+          fi
+          xcodebuild -version
+          swift --version
+          mkdir -p build/logs
+        env:
+          REQUESTED_XCODE: ${{ vars.XCODE_VERSION }}
+      - name: Validate project files and resolve local package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate-project.py
+          plutil -lint Patrimoine.xcodeproj/project.pbxproj Patrimoine/Resources/Info.plist Patrimoine/Resources/PrivacyInfo.xcprivacy Patrimoine/Resources/Patrimoine.entitlements
+          xcodebuild -resolvePackageDependencies -project Patrimoine.xcodeproj -scheme Patrimoine 2>&1 | tee build/logs/resolve.log
+      - name: Test financial engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee build/logs/core-tests.log
+      - name: Test persistence on iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEVICE_ID=$(xcrun simctl list devices available --json | python3 scripts/select-simulator.py)
+          xcodebuild test -project Patrimoine.xcodeproj -scheme Patrimoine -configuration Debug \
+            -destination "platform=iOS Simulator,id=$DEVICE_ID" -resultBundlePath build/Tests.xcresult \
+            -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/logs/simulator-tests.log
+      - name: Archive and package IPA
+        shell: bash
+        run: bash scripts/build-ipa.sh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD || 'release-testing' }}
+      - name: Publish verified package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Patrimoine-iOS-${{ github.run_number }}-${{ env.SIGNING_MODE }}
+          path: |
+            build/Patrimoine-iOS.ipa
+            build/build-info.json
+            build/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ github.run_number }}
+          path: |
+            build/logs/
+            build/Tests.xcresult
+          if-no-files-found: warn
+          retention-days: 3
