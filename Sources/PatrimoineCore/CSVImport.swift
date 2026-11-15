@@ -103,7 +103,8 @@ public struct CSVMapping: Sendable, Equatable {
         if date >= 0 && headers[date].lowercased() == "date" { time = find(["heure", "time"]) }
         fees = Set(headers.indices.filter {
             let name = headers[$0].lowercased()
-            return !name.hasPrefix("currency") && ["fee", "tax", "commission", "frais"].contains(where: { name.contains($0) })
+            return !name.hasPrefix("currency (") && !name.hasPrefix("devise (")
+                && ["fee", "tax", "commission", "frais"].contains(where: { name.contains($0) })
         })
     }
 }
@@ -153,6 +154,7 @@ public struct ImportLine: Identifiable, Sendable {
 
 public enum CSVImport {
     public static func preview(_ table: CSVTable, mapping: CSVMapping, now: Date = .now) throws -> [ImportLine] {
+        guard !table.rows.isEmpty else { throw ImportFailure("Le CSV ne contient aucune opération.") }
         guard [mapping.date, mapping.amount].allSatisfy({ table.headers.indices.contains($0) }),
               mapping.inferTradesFromQuantity ? table.headers.indices.contains(mapping.quantity) : table.headers.indices.contains(mapping.kind),
               table.headers.indices.contains(mapping.currency) || mapping.fixedCurrency == "EUR", mapping.basis != .unconfirmed else {

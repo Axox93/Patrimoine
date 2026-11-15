@@ -286,6 +286,8 @@ struct ImportView: View {
     }
     private func load(_ url: URL) {
         busy = true; error = nil; success = nil
+        source = ""; pdfText = ""; filename = ""; table = nil
+        lines = []; prepared = []; links = [:]; excluded = []; includeSimilar = []; balanceValidated = false
         Task {
             do {
                 let result = try await Task.detached(priority: .userInitiated) { try ImportDocumentReader.read(url) }.value

@@ -25,6 +25,7 @@ import UIKit
         XCTAssertThrowsError(try ImportDocumentReader.decode(Data("not a PDF".utf8), isPDF: true))
     }
     func testOversizedDocumentAndUTF16() throws {
+        XCTAssertThrowsError(try ImportDocumentReader.decode(Data(), isPDF: false))
         XCTAssertThrowsError(try ImportDocumentReader.decode(Data(repeating: 0, count: 5_000_001), isPDF: false))
         let text = "Date;Montant\n2026-01-02;123,45"
         XCTAssertEqual(try ImportDocumentReader.decode(try XCTUnwrap(text.data(using: .utf16)), isPDF: false).csv, text)

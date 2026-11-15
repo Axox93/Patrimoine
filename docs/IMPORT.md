@@ -16,6 +16,8 @@ L’import est **manuel et assisté**, depuis **Plus → Importer un compte**. I
 
 Après un nouvel export, refaire ce parcours sur le **même portefeuille**. Les identifiants de source déjà importés sont rapprochés. En leur absence, les mouvements similaires dans une fenêtre de 60 secondes sont signalés comme correspondances possibles, exclues par défaut. Une opération réellement distincte peut être réincluse explicitement.
 
+L’import reconstruit le journal et les positions ; il ne rafraîchit pas les cours de marché. Le total reste indisponible tant qu’une position ouverte n’a pas de valorisation déclarée en EUR. À date et heure identiques, l’ordre des lignes du fichier est conservé : vérifier cet ordre si plusieurs opérations sur le même titre sont horodatées à la même minute ou seconde.
+
 Deux identifiants source différents restent deux opérations distinctes, même avec les mêmes montants. Un identifiant déjà présent avec des données différentes bloque l’import ; aucune transaction historique n’est écrasée. Le contrôle est recalculé au moment de la confirmation, pas seulement lors de la prévisualisation.
 
 ## Courtiers

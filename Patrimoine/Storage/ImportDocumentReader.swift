@@ -17,6 +17,7 @@ enum ImportDocumentReader {
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16) else {
             throw ImportFailure("Encodage non reconnu. Exportez en UTF-8.")
         }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw ImportFailure("Le fichier CSV est vide.") }
         return Content(csv: text, pdfText: "")
     }
     static func read(_ url: URL) throws -> Content {

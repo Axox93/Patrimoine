@@ -75,6 +75,9 @@ final class CSVImportTests: XCTestCase {
     func testMappingAndBrutNetConfirmationRequired() throws {
         let table = try CSVTable("Action;Time;Total;Currency\nDeposit;2026-01-02 10:00:00;10;EUR")
         XCTAssertThrowsError(try CSVImport.preview(table, mapping: CSVMapping(headers: table.headers)))
+        let empty = try CSVTable("Action;Time;Total;Currency")
+        var confirmed = CSVMapping(headers: empty.headers); confirmed.basis = .gross
+        XCTAssertThrowsError(try CSVImport.preview(empty, mapping: confirmed))
     }
     func testStableIdentityScopedToAccount() throws {
         let row = try parse()
@@ -97,5 +100,12 @@ final class CSVImportTests: XCTestCase {
         XCTAssertNotNil(try CSVImport.preview(table, mapping: mapping)[0].issue)
         mapping.decimalSeparator = ","
         XCTAssertEqual(try CSVImport.preview(table, mapping: mapping)[0].movement?.amount, Decimal(string: "1.234"))
+    }
+    func testTrading212CurrencyConversionFeeIsSelectedButItsCurrencyIsNot() throws {
+        let table = try CSVTable("Action;Time;Total;Currency (Total);No. of shares;Ticker;Currency conversion fee;Currency (Currency conversion fee)\nMarket buy;2026-01-02 10:00:00;102;EUR;2;TEST;2;EUR")
+        var mapping = CSVMapping(headers: table.headers); mapping.basis = .netCash
+        XCTAssertEqual(mapping.fees, [6])
+        let row = try XCTUnwrap(CSVImport.preview(table, mapping: mapping)[0].movement)
+        XCTAssertEqual(row.amount, 100); XCTAssertEqual(row.fees, 2); XCTAssertEqual(row.cashMovement, -102)
     }
 }
